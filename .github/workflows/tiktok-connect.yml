@@ -1,0 +1,42 @@
+name: TikTok connect (one time)
+
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: "Leave EMPTY first: the run prints a link. Open it, press Allow, then run again and paste the address you landed on here."
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  connect:
+    runs-on: ubuntu-24.04
+    env:
+      TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+      TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+      TIKTOK_REDIRECT_URI: ${{ vars.TIKTOK_REDIRECT_URI || format('https://github.com/{0}', github.repository) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Print the link to allow posting
+        if: ${{ inputs.code == '' }}
+        run: |
+          echo "### Open this link, log in to TikTok and press Allow:" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          python3 tiktok/tiktok.py auth-url >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Then copy the address of the page you land on and run this workflow again with it." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save the connection
+        if: ${{ inputs.code != '' }}
+        env:
+          CODE: ${{ inputs.code }}
+        run: |
+          python3 tiktok/tiktok.py exchange "$CODE"
+          git config user.name "tiktok-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tiktok/token.enc
+          git commit -m "Connect TikTok account"
+          git push
